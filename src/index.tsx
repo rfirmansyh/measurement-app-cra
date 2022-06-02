@@ -1,19 +1,59 @@
-import React from 'react';
+import { AnimatePresence } from 'framer-motion';
+import React, { Component } from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
-import App from './App';
-import reportWebVitals from './reportWebVitals';
+import AppContainer from './container/App/AppContainer';
+import './styles/app.css';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();
+class ErrorBoundary extends Component {
+  constructor(props: any) {
+    super(props);
+    // @ts-ignore
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: any) {}
+  componentDidCatch(error: any, errorInfo: any) {
+    // alert(JSON.stringify(error));
+  }
+  render() {
+    // @ts-ignore
+    return this.props.children; 
+  }
+}
+
+if (process.env.REACT_APP_MODE && process.env.REACT_APP_MODE === 'preview') {
+  root.render(
+    <ErrorBoundary>
+      <AnimatePresence initial={true} exitBeforeEnter>
+        <AppContainer />
+      </AnimatePresence>
+    </ErrorBoundary>
+  );
+} else {
+  if (typeof window !== 'undefined') {
+    // @ts-ignore
+    window.measurementApp = {
+      basePath: '',
+      init(options: any) {
+        this.basePath = options.basePath;
+      },
+      open() {
+        root.render(
+          <ErrorBoundary>
+            <AnimatePresence initial={true} exitBeforeEnter>
+              <AppContainer measurementCore={this} measurementCorePath={this.basePath} />
+            </AnimatePresence>
+          </ErrorBoundary>
+        );
+      },
+      close() {
+        root.render('');
+      }
+    };
+  }
+}
+
