@@ -1028,7 +1028,7 @@ const AppContainer = ({
           <h1 className="text-[24px] text-primary font-medium mb-2">Can’t access your camera</h1>
           <div className="flex justify-center my-4">
             <img 
-              src={`${measurementCorePath}`} 
+              src={`${measurementCorePath}/img/icons/cam-error-other.svg`} 
               className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
               alt="" 
             />
