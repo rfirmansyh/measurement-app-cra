@@ -117,7 +117,7 @@ const AppContainer = ({
   const [uploadInfo, setUploadInfo] = useState<TUploadInfo>('idle');
   const [uploadResultFile, setUploadResultFile] = useState<any>(null);
   const [uploadResultSrc, setUploadResultSrc] = useState('');
-  const [debugMode, setDebugMode] = useState(true);
+  const [debugMode, setDebugMode] = useState(false);
   const [debugStr, setDebugStr] = useState('');
 
   // logic
