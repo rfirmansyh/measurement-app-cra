@@ -24,6 +24,7 @@ enum EStep {
   landing,
   camera,
   upload,
+  notPotrait,
 }
 type TCameraInfo = 'idle' 
   | 'loading' 
@@ -35,7 +36,6 @@ type TCameraInfo = 'idle'
   | 'uploading'
   | 'has-result-success' 
   | 'has-result-error' 
-  | 'orientation-change' 
 type TValidationResult = 'idle' 
   | 'validating'
   | 'invalid-no-face' 
@@ -174,6 +174,10 @@ const AppContainer = ({
   //     setCameraInfo('no-faceapi-loaded');
   //   }
   // };
+  const handlePreventLandscape = () => {
+    setStep(EStep.notPotrait);
+    handleCloseVideo();
+  };
   const handleLoadCamera = () => {
     setStep(EStep.camera);
     setOptionSelected('camera');
@@ -198,7 +202,7 @@ const AppContainer = ({
         });
     }
   };
-  const handleCloseVideo = async () => {
+  const handleCloseVideo = () => {
     if (cameraPhoto) {
       cameraPhoto.stopCamera()
         .then(() => {
@@ -217,7 +221,7 @@ const AppContainer = ({
     setWebcamSrc(dataUri);
     setValidationResult('validating');
     setCameraInfo('uploading');
-    await handleCloseVideo();
+    handleCloseVideo();
   };
   const handleValidateCamera = (resizedDetections: any) => {
     if (resizedDetections?.detection?.score && resizedDetections.detection.score >= 0.50) {
@@ -617,6 +621,14 @@ const AppContainer = ({
         }
 
         // detect device orientation
+        if (browserDetection.isMobile()) {
+          if (window.screen.availWidth > window.screen.availHeight) {
+            handlePreventLandscape();
+          }
+          window.addEventListener('orientationchange', () => {
+            handlePreventLandscape();
+          });
+        }
 
         return () => {
           document.body.removeChild(script);
@@ -762,6 +774,22 @@ const AppContainer = ({
           >
             Try Again
           </Button>
+        </div>
+      );
+    case EStep.notPotrait:
+      return (
+        <div className="py-[50px] px-[25px]">
+          <h1 className="text-[24px] text-primary font-medium mb-2">Phone Orientation</h1>
+          <div className="flex justify-center mb-8 mt-4">
+            <img 
+              src={measurementCorePath + '/img/icons/notpotrait.svg'} 
+              className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
+              alt="" 
+            />
+          </div>
+          <p className="text-[14px] md:text-[16px] text-primary font-light max-w-[357px] mx-auto mb-6">
+            For accurate result, hold your phone in potrait mode
+          </p>
         </div>
       );
     case EStep.start:

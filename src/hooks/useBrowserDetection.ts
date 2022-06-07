@@ -7,12 +7,12 @@ const useBrowserDetection = () => {
 
   // memo
   const unsupportedBrowsers = useMemo(() => ({
-    Chrome: 104,
-    Firefox: 120,
+    Chrome: 70,
+    Firefox: 60,
     IE: 10,
     Edge: 15,
     Opera: 50,
-    Safari: 15
+    Safari: 12
   }), []);
 
   const _detectBrowser = () => {
