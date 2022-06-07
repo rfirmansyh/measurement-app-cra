@@ -286,8 +286,7 @@ const AppContainer = ({
             && (totalYLandmarksLeft >= 0.64 && totalYLandmarksLeft <= 0.80)
             && (totalYLandmarksRight >= 0.64 && totalYLandmarksLeft <= 0.80)
           ) {
-            // setValidationResult('valid');
-            setValidationResult('validating');
+            setValidationResult('valid');
           } else {
             setValidationResult('invalid-face-tilted');
           }
@@ -532,40 +531,6 @@ const AppContainer = ({
     }
   };
   // 3. Api Handler
-  const handleValidateCard = useFormik({
-    initialValues: {
-      capture: '',
-      email: '',
-    },
-    onSubmit: async (values) => {
-      setUploadInfo('uploading');
-      setValidationResult('validating');
-      try {
-        if (optionSelected === 'camera' && values.capture) {
-          await apiPost({ 
-            url: 'measurement/check/card', 
-            data: values,
-          });
-        } else {
-          const bodyFormData = new FormData();
-          // @ts-ignore
-          bodyFormData.append('email', values.email);
-          bodyFormData.append('image', uploadResultFile);
-          await apiPost({ 
-            url: 'measurement/check/card', 
-            data: bodyFormData,
-            isFormData: true,
-          });
-        }
-        handleUpload.handleSubmit();
-      } catch (err) {
-        console.log({err});
-        setCameraInfo('no-card');
-        setUploadInfo('no-card');
-        setValidationResult('idle');
-      }
-    },
-  });
   const handleUpload = useFormik({
     initialValues: {
       capture: '',
@@ -699,9 +664,7 @@ const AppContainer = ({
   }, [webcamStartCountdown, validationResult]);
   useEffect(() => {
     if (webcamSrc && handleUpload.values.email) {
-      handleValidateCard.setFieldValue('email', handleUpload.values.email);
-      handleValidateCard.setFieldValue('capture', webcamSrc);
-      handleValidateCard.handleSubmit();
+      handleUpload.handleSubmit();
     }
   }, [webcamSrc, handleUpload.values.email]); // eslint-disable-line
 
@@ -1321,6 +1284,7 @@ const AppContainer = ({
               wrapper-video relative flex justify-center items-center min-h-[10px] 
               h-auto w-auto max-h-[640px] md:max-h-[480px] mx-auto bg-light 
               ${!isWebcameDone && cameraInfo !== 'uploading' ? 'block' : 'hidden'} 
+              ${cameraInfo === 'loading' ? 'opacity-0' : ''}
               overflow-hidden
             `}
           >
@@ -1578,7 +1542,7 @@ const AppContainer = ({
                 variant="outline"
                 type="button"
                 onClick={handleOpenUploader}
-                disabled={handleUpload.isSubmitting || handleValidateCard.isSubmitting}
+                disabled={handleUpload.isSubmitting}
                 className="flex !flex-nowrap"
               >
                 Try Again
@@ -1586,8 +1550,8 @@ const AppContainer = ({
               <Button
                 variant="filled"
                 type="button"
-                onClick={() => handleValidateCard.handleSubmit()}
-                disabled={handleUpload.isSubmitting || handleValidateCard.isSubmitting}
+                onClick={() => handleUpload.handleSubmit()}
+                disabled={handleUpload.isSubmitting}
                 className="flex !flex-nowrap"
               >
                 Submit
