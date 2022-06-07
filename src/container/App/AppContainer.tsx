@@ -11,12 +11,16 @@ import Decoration from './partials/Decoration';
 import config from '../../utils/config';
 import Button from '../../components/Button';
 import Input from './partials/Input';
+import useBrowserDetection from '../../hooks/useBrowserDetection';
 
 enum EStep {
   start,
   help1,
   help2,
   help3,
+  preparing,
+  noResource,
+  notSupport,
   landing,
   camera,
   upload,
@@ -25,13 +29,13 @@ type TCameraInfo = 'idle'
   | 'loading' 
   | 'ready' 
   | 'no-constraint' 
-  | 'no-faceapi-loaded' 
   | 'no-card' 
   | 'not-allowed' 
   | 'not-detected' 
   | 'uploading'
   | 'has-result-success' 
   | 'has-result-error' 
+  | 'orientation-change' 
 type TValidationResult = 'idle' 
   | 'validating'
   | 'invalid-no-face' 
@@ -94,6 +98,7 @@ const AppContainer = ({
 }: AppContainerProps) => {
   // hooks
   const cameraPhoto = useCamera();
+  const browserDetection = useBrowserDetection();
 
   // refs
   const videoRef = useRef<HTMLVideoElement>(null!);
@@ -101,10 +106,9 @@ const AppContainer = ({
   const inputFileRef = useRef<HTMLInputElement>(null!);
 
   // state
-  const [step, setStep] = useState<EStep>(EStep.start);
+  const [step, setStep] = useState<EStep>(EStep.preparing);
   const [device, setDevice] = useState<'dekstop' | 'mobile'>('dekstop');
   const [optionSelected, setOptionSelected] = useState<'idle' | 'camera' | 'upload'>('camera');
-  const [moduleStatus, setModuleStatus] = useState<'loading'|'error'|'uploading'|'success'>('loading');
   const [cameraInfo, setCameraInfo] = useState<TCameraInfo>('idle');
   const [validationResult, setValidationResult] = useState<TValidationResult>('idle');
   const [webcamSrc, setWebcamSrc] = useState('');
@@ -113,7 +117,7 @@ const AppContainer = ({
   const [uploadInfo, setUploadInfo] = useState<TUploadInfo>('idle');
   const [uploadResultFile, setUploadResultFile] = useState<any>(null);
   const [uploadResultSrc, setUploadResultSrc] = useState('');
-  const [debugMode, setDebugMode] = useState(false);
+  const [debugMode, setDebugMode] = useState(true);
   const [debugStr, setDebugStr] = useState('');
 
   // logic
@@ -124,7 +128,6 @@ const AppContainer = ({
     || cameraInfo === 'no-constraint'
     || cameraInfo === 'not-allowed'
     || cameraInfo === 'not-detected'
-    || cameraInfo === 'no-faceapi-loaded'
   )();
   const isUploadDone = (() => 
     uploadInfo === 'has-result-error'
@@ -195,7 +198,7 @@ const AppContainer = ({
         });
     }
   };
-  const handleCloseVideo = () => {
+  const handleCloseVideo = async () => {
     if (cameraPhoto) {
       cameraPhoto.stopCamera()
         .then(() => {
@@ -205,7 +208,7 @@ const AppContainer = ({
         });
     }
   };
-  const handleTakePhoto = () => {
+  const handleTakePhoto = async () => {
     setWebcamStartCountDown(false);
     let dataUri = cameraPhoto.getDataUri(configCamera);
     if (unsubInterval) {
@@ -214,7 +217,7 @@ const AppContainer = ({
     setWebcamSrc(dataUri);
     setValidationResult('validating');
     setCameraInfo('uploading');
-    handleCloseVideo();
+    await handleCloseVideo();
   };
   const handleValidateCamera = (resizedDetections: any) => {
     if (resizedDetections?.detection?.score && resizedDetections.detection.score >= 0.50) {
@@ -326,20 +329,16 @@ const AppContainer = ({
         height: videoRef.current.getBoundingClientRect().height, 
       };
 
-      // const canvas = faceapi.createCanvasFromMedia(event.target);
-      // canvas.id = 'canvas-faceapi';
-      // canvas.style.position = 'absolute';
-      // canvas.style.top = 0;
+      const canvas = faceapi.createCanvasFromMedia(event.target);
+      canvas.id = 'canvas-faceapi';
+      canvas.style.position = 'absolute';
+      canvas.style.top = 0;
       
-      // const canvasDebug = event.target.parentElement?.querySelector('canvas#canvas-debug') as HTMLCanvasElement;
-      // canvasDebug.width = displaySize.width;
-      // canvasDebug.height = displaySize.height;
-
       // @ts-ignore
-      // if (!videoRef.current.parentElement?.querySelector('canvas')) {
-      //   videoRef.current.parentElement?.append(canvas);
-      // }
-      // faceapi.matchDimensions(canvas, displaySize);
+      if (!videoRef.current.parentElement?.querySelector('canvas')) {
+        videoRef.current.parentElement?.append(canvas);
+      }
+      faceapi.matchDimensions(canvas, displaySize);
 
       const canvasDebug = event.currentTarget.parentElement?.querySelector('canvas#canvas-debug') as HTMLCanvasElement;
       let canvasDebugCtx: any = null;
@@ -586,44 +585,48 @@ const AppContainer = ({
 
   // effect
   useEffect(() => {
-    // @ts-ignore
-    console.log({ measurementCore });
+    // make sure the browser is supported this app
+    if (browserDetection.browserIsReady) {
+      console.log(browserDetection.browser);
+      if (browserDetection.isSupported()) {
+        // load faceapi script
+        setStep(EStep.preparing);
+        const script = document.createElement('script');
+        script.src = `${measurementCorePath}/vendors/face-api/face-api.min.js`;
+        script.async = true;
+        document.body.appendChild(script);
+        script.onload = async function() {
+          // @ts-ignore
+          faceapi = window.faceapi;
+          try {
+            await Promise.all([
+              faceapi.nets.tinyFaceDetector.loadFromUri(`${measurementCorePath}/vendors/face-api/model`),
+              faceapi.nets.faceLandmark68Net.loadFromUri(`${measurementCorePath}/vendors/face-api/model`),
+              faceapi.nets.faceRecognitionNet.loadFromUri(`${measurementCorePath}/vendors/face-api/model`),
+            ]);
+            setStep(EStep.start);
+          } catch (err) {
+            setStep(EStep.noResource);
+          }
+        };
 
-    const script = document.createElement('script');
+        // webcam setup
+        setDevice(window.matchMedia('(max-width: 600px)').matches ? 'mobile' : 'dekstop');
+        if (videoRef.current) {
+          cameraPhoto.initVideoEl(videoRef.current);
+        }
 
-    script.src = `${measurementCorePath}/vendors/face-api/face-api.min.js`;
-    script.async = true;
+        // detect device orientation
 
-    document.body.appendChild(script);
-
-    script.onload = async function() {
-      // @ts-ignore
-      faceapi = window.faceapi;
-
-      try {
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(`${measurementCorePath}/vendors/face-api/model`),
-          faceapi.nets.faceLandmark68Net.loadFromUri(`${measurementCorePath}/vendors/face-api/model`),
-          faceapi.nets.faceRecognitionNet.loadFromUri(`${measurementCorePath}/vendors/face-api/model`),
-        ]);
-        setModuleStatus('success');
-      } catch (err) {
-        setModuleStatus('error');
-        setCameraInfo('no-faceapi-loaded');
+        return () => {
+          document.body.removeChild(script);
+          measurementCore = null;
+        };
+      } else {
+        setStep(EStep.notSupport);
       }
-    };
-
-    // webcam setup
-    setDevice(window.matchMedia('(max-width: 600px)').matches ? 'mobile' : 'dekstop');
-    if (videoRef.current) {
-      cameraPhoto.initVideoEl(videoRef.current);
     }
-
-    return () => {
-      document.body.removeChild(script);
-      measurementCore = null;
-    };
-  }, []); // eslint-disable-line
+  }, [browserDetection.browserIsReady]);
   useEffect(() => {
     if (optionSelected === 'camera') {
       handleUpload.setFieldValue('capture', webcamSrc);
@@ -679,6 +682,88 @@ const AppContainer = ({
   // renderer
   const renderStartContent = (() => {
     switch (step) {
+    case EStep.notSupport:
+      return (
+        <div className="py-[50px] px-[25px]">
+          <h1 className="text-[24px] text-primary font-medium mb-2">Upps, Your environtment seems not supported</h1>
+          {browserDetection.isMobile()
+            ? (
+              <div className="flex justify-center mb-8 mt-4">
+                <img 
+                  src={measurementCorePath + '/img/icons/phone-notsupport.svg'} 
+                  className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
+                  alt="" 
+                />
+              </div>
+            )
+            : (
+              <div className="flex justify-center mb-8 mt-4">
+                <img 
+                  src={measurementCorePath + '/img/icons/pc-notsupport.svg'} 
+                  className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
+                  alt="" 
+                />
+              </div>
+            )}
+
+          <p className="text-[14px] md:text-[16px] text-primary font-light max-w-[357px] mx-auto mb-6">
+            Please check your browser or system version. and try to upgrade it.
+            if this error still happen, try to use different device
+          </p>
+
+          <Button
+            variant="filled"
+            type="button"
+            className="flex !flex-nowrap mx-auto"
+            onClick={() => measurementCore?.close()}
+          >
+            Finish
+          </Button>
+        </div>
+      );
+    case EStep.preparing:
+      return (
+        <div className="py-[50px] px-[25px] flex flex-col items-center text-center">
+          <h1 className="text-[24px] text-primary font-medium mb-2">IPD Measurement by Bryant Dental</h1>
+          <div className="text-[16px] text-black font-normal">The best way to measure your IPD value</div>
+
+          <svg className="w-[10rem] h-[10rem] mr-2 text-primary animate-spin flex-shrink-0 my-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+
+          <p className="text-[14px] md:text-[16px] text-primary font-light max-w-[455px] mx-auto">
+            Preparing the resources...
+          </p>
+        </div>
+      );
+    case EStep.noResource:
+      return (
+        <div className="py-[50px] px-[25px]">
+          <h1 className="text-[24px] text-primary font-medium mb-2">Upps,  Something wrong</h1>
+          <div className="flex justify-center mb-8 mt-4">
+            <img 
+              src={measurementCorePath + '/img/icons/resources-error.svg'} 
+              className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
+              alt="" 
+            />
+          </div>
+
+          <p className="text-[14px] md:text-[16px] text-primary font-light max-w-[357px] mx-auto mb-6">
+            Error when downloading the resources.
+            Please check your connection and Refresh the page.
+          </p>
+
+          <Button
+            variant="filled"
+            type="button"
+            className="flex !flex-nowrap mx-auto"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </Button>
+        </div>
+      );
     case EStep.start:
       return (
         <div className="py-[50px] px-[25px]">
@@ -771,7 +856,7 @@ const AppContainer = ({
 
           <div className="relative w-[190px] h-[229px] mx-auto my-[35px] md:my-[50px]">
             <img
-              src={`${measurementCorePath}/img/misc/illustration-valid.svg`}
+              src={measurementCorePath + '/img/misc/illustration-valid.svg'}
               className="object-contain object-center"
               alt=""
             />
@@ -801,7 +886,7 @@ const AppContainer = ({
 
           <div className="relative w-full h-[320px] mx-auto my-[35px] md:my-[50px] rounded-[10px] overflow-hidden">
             <img
-              src={`${measurementCorePath}/img/placeholder/example.jpg`}
+              src={measurementCorePath + '/img/placeholder/example.jpg'}
               className="object-contain object-center"
               alt=""
             />
@@ -895,7 +980,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-red-500 rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={`${measurementCorePath}/img/icons/face-not-center.svg`} 
+              src={measurementCorePath + '/img/icons/face-not-center.svg'} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -910,7 +995,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-red-500 rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={`${measurementCorePath}/img/icons/face-too-far.svg`} 
+              src={measurementCorePath + '/img/icons/face-too-far.svg'} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -925,7 +1010,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-red-500 rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={`${measurementCorePath}/img/icons/face-tilted.svg`} 
+              src={measurementCorePath + '/img/icons/face-tilted.svg'} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -940,7 +1025,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-red-500 rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={`${measurementCorePath}/img/icons/face-not-detected.svg`} 
+              src={measurementCorePath + '/img/icons/face-not-detected.svg'} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -955,7 +1040,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-secondary rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={`${measurementCorePath}/img/icons/face-valid.svg`} 
+              src={measurementCorePath + '/img/icons/face-valid.svg'} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative"
               alt="" 
             />
@@ -978,7 +1063,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-black rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={`${measurementCorePath}/img/icons/face-loading.svg`} 
+              src={measurementCorePath + '/img/icons/face-loading.svg'} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -993,7 +1078,7 @@ const AppContainer = ({
         <div className="flex items-start gap-3 px-3 pb-2 pt-5 rounded-[5px] text-left">
           <div className="flex justify-center">
             <img 
-              src={`${measurementCorePath}/img/icons/logo.svg`} 
+              src={measurementCorePath + '/img/icons/logo.svg'} 
               className="w-[18px] md:w-[24px]" 
               alt="" 
             />
@@ -1006,7 +1091,7 @@ const AppContainer = ({
     }
   })();
   const renderCameraInfo = (() => {
-    if (cameraInfo === 'loading' || moduleStatus === 'loading') {
+    if (cameraInfo === 'loading') {
       return (
         <section key="camera-loading" className="bg-light absolute top-[10px] bottom-[10px] left-[10px] right-[10px] px-6 rounded-[8px] flex flex-col items-center text-center py-[35px]">
           <h1 className="text-[24px] text-primary font-medium mb-2">Measure your IPD</h1>
@@ -1028,7 +1113,7 @@ const AppContainer = ({
           <h1 className="text-[24px] text-primary font-medium mb-2">Can’t access your camera</h1>
           <div className="flex justify-center my-4">
             <img 
-              src={`${measurementCorePath}/img/icons/cam-error-other.svg`} 
+              src={measurementCorePath + '/img/icons/cam-error-other.svg'} 
               className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
               alt="" 
             />
@@ -1048,7 +1133,7 @@ const AppContainer = ({
           <h1 className="text-[24px] text-primary font-medium mb-2">Camera not detected</h1>
           <div className="flex justify-center mb-8 mt-4">
             <img 
-              src={`${measurementCorePath}/img/icons/cam-notfound.svg`} 
+              src={measurementCorePath + '/img/icons/cam-notfound.svg'} 
               className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
               alt="" 
             />
@@ -1061,41 +1146,13 @@ const AppContainer = ({
         </section>
       );
     }
-    if (cameraInfo === 'no-faceapi-loaded') {
-      return (
-        <section key="no-faceapi-loaded" className="bg-light absolute top-[10px] bottom-[10px] left-[10px] right-[10px] px-6 rounded-[8px] flex flex-col items-center text-center py-[35px]">
-          <h1 className="text-[24px] text-primary font-medium mb-2">Upps,  Something wrong</h1>
-          <div className="flex justify-center mb-8 mt-4">
-            <img 
-              src={`${measurementCorePath}/img/icons/resources-error.svg`} 
-              className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
-              alt="" 
-            />
-          </div>
-
-          <p className="text-[14px] md:text-[16px] text-primary font-light max-w-[357px] mx-auto mb-6">
-            Error when downloading the resources.
-            Please check your connection and Try again.
-          </p>
-
-          <Button
-            variant="filled"
-            type="button"
-            className="flex !flex-nowrap mx-auto"
-            onClick={() => measurementCore?.close()}
-          >
-            Try Again
-          </Button>
-        </section>
-      );
-    }
     if (cameraInfo === 'no-card') {
       return (
         <section key="card-not-detected" className="bg-light absolute top-[10px] bottom-[10px] left-[10px] right-[10px] px-6 rounded-[8px] flex flex-col items-center text-center py-[35px]">
           <h1 className="text-[24px] text-primary font-medium mb-2">Try a different card</h1>
           <div className="flex justify-center">
             <img 
-              src={`${measurementCorePath}/img/icons/card-not-detected.svg`} 
+              src={measurementCorePath + '/img/icons/card-not-detected.svg'} 
               className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
               alt="" 
             />
@@ -1155,7 +1212,7 @@ const AppContainer = ({
           <h1 className="text-[24px] text-secondary font-medium mb-2">Image Uploaded !</h1>
           <div className="flex justify-center">
             <img 
-              src={`${measurementCorePath}/img/icons/upload-success.svg`} 
+              src={measurementCorePath + '/img/icons/upload-success.svg'} 
               className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
               alt="" 
             />
@@ -1183,7 +1240,7 @@ const AppContainer = ({
           <h1 className="text-[24px] text-danger font-medium mb-2">Upload Failed !</h1>
           <div className="flex justify-center">
             <img 
-              src={`${measurementCorePath}/img/icons/upload-failed.svg`} 
+              src={measurementCorePath + '/img/icons/upload-failed.svg'} 
               className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative"
               alt=""
             />
@@ -1237,7 +1294,7 @@ const AppContainer = ({
             <canvas id="canvas-debug" className="absolute top-0 left-0"></canvas>
 
             {/* area validation */}
-            {cameraInfo !== 'loading' && moduleStatus !== 'loading' && (
+            {cameraInfo !== 'loading' && (
               <Fragment>
                 <div id="areaCamera" className={areaCameraClass}></div>
                 {webcamStartCountdown && webcamCountdown !== 0 && (
@@ -1326,7 +1383,7 @@ const AppContainer = ({
           <h1 className="text-[24px] text-primary font-medium mb-2">Try a different card</h1>
           <div className="flex justify-center">
             <img 
-              src={`${measurementCorePath}/img/icons/card-not-detected.svg`} 
+              src={measurementCorePath + '/img/icons/card-not-detected.svg'} 
               className="w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
               alt="" 
             />
@@ -1348,40 +1405,13 @@ const AppContainer = ({
         </section>
       );
     }
-    if (cameraInfo === 'no-faceapi-loaded') {
-      return (
-        <section key="no-faceapi-loaded" className="bg-light absolute top-[10px] bottom-[10px] left-[10px] right-[10px] px-6 rounded-[8px] flex flex-col items-center text-center py-[35px]">
-          <h1 className="text-[24px] text-primary font-medium mb-2">Upps,  Something wrong</h1>
-          <div className="flex justify-center mb-8 mt-4">
-            <img 
-              src={`${measurementCorePath}/img/icons/resources-error.svg`} 
-              className="animate-smooth-rotate w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
-              alt="" 
-            />
-          </div>
-          <p className="text-[14px] md:text-[16px] text-primary font-light max-w-[357px] mx-auto mb-6">
-            Error when downloading the resources.
-            Please check your connection and Try again.
-          </p>
-
-          <Button
-            variant="filled"
-            type="button"
-            className="flex !flex-nowrap mx-auto"
-            onClick={() => measurementCore?.close()}
-          >
-            Try Again
-          </Button>
-        </section>
-      );
-    }
     if (uploadInfo === 'has-result-success') {
       return (
         <section key="camera-result-success" className="bg-light absolute top-[10px] bottom-[10px] left-[10px] right-[10px] px-6 rounded-[8px] flex flex-col items-center text-center py-[35px]">
           <h1 className="text-[24px] text-secondary font-medium mb-2">Image Uploaded !</h1>
           <div className="flex justify-center">
             <img 
-              src={`${measurementCorePath}/img/icons/upload-success.svg`} 
+              src={measurementCorePath + '/img/icons/upload-success.svg'} 
               className="w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
               alt="" 
             />
@@ -1409,7 +1439,7 @@ const AppContainer = ({
           <h1 className="text-[24px] text-danger font-medium mb-2">Upload Failed !</h1>
           <div className="flex justify-center">
             <img 
-              src={`${measurementCorePath}/img/icons/upload-error.svg`} 
+              src={measurementCorePath + '/img/icons/upload-error.svg'} 
               className="w-[120px] h-[120px] md:w-[180px] md:h-[180px] relative" 
               alt="" 
             />

@@ -10,6 +10,7 @@ interface AxiosInstanceProps extends AxiosRequestConfig {
 interface AxiosRequestProps extends AxiosInstanceProps {
   url: string,
 }
+  
 const axiosInstance = (props: AxiosInstanceProps):AxiosInstance => {
   const {
     isFormData,
