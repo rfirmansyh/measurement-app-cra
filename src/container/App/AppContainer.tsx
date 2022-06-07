@@ -238,12 +238,18 @@ const AppContainer = ({
       const validDistanceCompareValue = mobile ? areaEl.offsetHeight * 0.40 : areaEl.offsetHeight * 0.50;
       const rzDet = resizedDetections.alignedRect.box;
       const landmarkFace1 = resizedDetections.landmarks.positions[0];
+      const landmarkFace9 = resizedDetections.landmarks.positions[8];
       const landmarkFace17 = resizedDetections.landmarks.positions[16];
       const poss = resizedDetections.landmarks.positions;
       const leftEye = resizedDetections.landmarks.getLeftEye();
-      const totalXlandmarks = poss[16].x - landmarkFace1.x;
+      const totalXlandmarks = landmarkFace17.x - landmarkFace1.x;
+      const totalYLandmarksLeft = (landmarkFace9.y - landmarkFace1.y) / rzDet.height;
+      const totalYLandmarksRight = (landmarkFace9.y - landmarkFace17.y) / rzDet.height;
       const percentageXfaceToXeye = (leftEye[0].x - landmarkFace1.x) / totalXlandmarks;
-      const percentageYfaceToYeye = (landmarkFace1.y - landmarkFace17.y) / totalXlandmarks;
+      const percentageFaceRotation = (landmarkFace1.y - landmarkFace17.y) / totalXlandmarks;
+
+      console.log({ totalYLandmarksLeft });
+      console.log({ totalYLandmarksRight });
 
       const area = {
         left: areaEl.offsetLeft,
@@ -276,9 +282,12 @@ const AppContainer = ({
           // }
           if (
             (percentageXfaceToXeye >= 0.175 && percentageXfaceToXeye <= 0.23)
-            && (percentageYfaceToYeye > -0.06 && percentageYfaceToYeye < 0.06)
+            && (percentageFaceRotation > -0.06 && percentageFaceRotation < 0.06)
+            && (totalYLandmarksLeft >= 0.64 && totalYLandmarksLeft <= 0.80)
+            && (totalYLandmarksRight >= 0.64 && totalYLandmarksLeft <= 0.80)
           ) {
-            setValidationResult('valid');
+            // setValidationResult('valid');
+            setValidationResult('validating');
           } else {
             setValidationResult('invalid-face-tilted');
           }
@@ -421,6 +430,12 @@ const AppContainer = ({
             canvasDebugCtx!.lineWidth = 1;
             canvasDebugCtx!.strokeStyle = 'pink';
             canvasDebugCtx!.rect(leftEye[5].x - 5, leftEye[5].y - 5, 10, 10);
+            canvasDebugCtx!.stroke();
+            // white
+            canvasDebugCtx?.beginPath();
+            canvasDebugCtx!.lineWidth = 1;
+            canvasDebugCtx!.strokeStyle = 'black';
+            canvasDebugCtx!.rect(poss[8].x - 5, poss[8].y - 5, 10, 10);
             canvasDebugCtx!.stroke();
             // white
             canvasDebugCtx?.beginPath();
