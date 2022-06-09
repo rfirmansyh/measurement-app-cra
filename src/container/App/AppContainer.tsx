@@ -59,6 +59,7 @@ type TConfig = {
 }
 
 var faceapi: any = null;
+var unsubIntervalDrawer: any;
 var unsubInterval: any;
 var unsubCountdownInterval: any = null;
 var configCamera = {
@@ -117,7 +118,7 @@ const AppContainer = ({
   const [uploadInfo, setUploadInfo] = useState<TUploadInfo>('idle');
   const [uploadResultFile, setUploadResultFile] = useState<any>(null);
   const [uploadResultSrc, setUploadResultSrc] = useState('');
-  const [debugMode, setDebugMode] = useState(false);
+  const [debugMode, setDebugMode] = useState(true);
   const [debugStr, setDebugStr] = useState('');
 
   // logic
@@ -248,9 +249,6 @@ const AppContainer = ({
       const percentageXfaceToXeye = (leftEye[0].x - landmarkFace1.x) / totalXlandmarks;
       const percentageFaceRotation = (landmarkFace1.y - landmarkFace17.y) / totalXlandmarks;
 
-      console.log({ totalYLandmarksLeft });
-      console.log({ totalYLandmarksRight });
-
       const area = {
         left: areaEl.offsetLeft,
         right: areaEl.offsetLeft + areaEl.offsetWidth,
@@ -287,6 +285,7 @@ const AppContainer = ({
             && (totalYLandmarksRight >= 0.64 && totalYLandmarksLeft <= 0.80)
           ) {
             setValidationResult('valid');
+            // setValidationResult('validating');
           } else {
             setValidationResult('invalid-face-tilted');
           }
@@ -299,6 +298,161 @@ const AppContainer = ({
     } else {
       setValidationResult('invalid-no-face');
     }
+  };
+  const handleDrawMesh = (resizedDetections: any, canvas: any) => {
+    console.log('handleDrawMesh', resizedDetections.landmarks);
+    const pos = resizedDetections.landmarks.positions;
+    const jaw = resizedDetections.landmarks.getJawOutline();
+    const nose = resizedDetections.landmarks.getNose();
+    const mouth = resizedDetections.landmarks.getMouth();
+    const eyeLeft = resizedDetections.landmarks.getLeftEye();
+    const eyeLeftEyeBrow = resizedDetections.landmarks.getLeftEyeBrow();
+    const eyeRight = resizedDetections.landmarks.getRightEye();
+    const eyeRightEyeBrow = resizedDetections.landmarks.getRightEyeBrow();
+    const centerTop = {
+      x: eyeRightEyeBrow[0].x - ((eyeRightEyeBrow[0].x - eyeLeftEyeBrow[4].x) / 2),
+      y: nose[0].y - (nose[3].y - nose[0].y),
+    };
+    // const centerPointEye = (() => {
+    //   const x = eyeRightEyeBrow[0].x - ((eyeRightEyeBrow[0].x - eyeLeftEyeBrow[4].x) / 2);
+    //   const y = eyeLeftEyeBrow[4].y - ((eyeLeftEyeBrow[4].y - nose[0].y) / 2);
+    //   return { x, y };
+    // })();
+    const drawCircle = (x: any, y: any) => {
+      canvasCtx?.beginPath();
+      canvasCtx!.arc(x, y, 1.5, 0, 2 * Math.PI);
+      canvasCtx!.fillStyle = '#fff';
+      canvasCtx!.fill();
+    };
+    const drawLine = (x1: any, y1: any, x2: any, y2: any) => {
+      canvasCtx!.beginPath();
+      canvasCtx!.moveTo(x1, y1);
+      canvasCtx!.lineTo(x2, y2);
+      canvasCtx!.lineWidth = 1.5;
+      canvasCtx!.lineCap = 'round';
+      canvasCtx!.strokeStyle = '#65DD75';
+      canvasCtx!.stroke();
+    };
+    // 0 - 16 -> jaw outline
+    // 17 - 21 -> eyebrow left
+    // 22 - 26 -> eyebrow right
+    // 27 - 35 -> nose
+    // 36 - 41 -> eye left
+    // 42 - 47 -> eye right
+    // 48 - 59 -> mouth outside
+    // 60 - 63 -> mouth inside
+    const canvasCtx = canvas.getContext('2d');
+    canvasCtx?.clearRect(0, 0, canvas.width, canvas.height);
+    // start draw left side
+    drawLine(eyeLeftEyeBrow[0].x, eyeLeftEyeBrow[0].y, jaw[1].x, jaw[1].y);
+    drawLine(eyeLeftEyeBrow[0].x, eyeLeftEyeBrow[0].y, eyeLeft[0].x, eyeLeft[0].y);
+    drawLine(eyeLeftEyeBrow[0].x, eyeLeftEyeBrow[0].y, centerTop.x, centerTop.y);
+    drawLine(eyeLeft[3].x, eyeLeft[3].y, nose[0].x, nose[0].y);
+    drawLine(eyeLeft[3].x, eyeLeft[3].y, nose[4].x, nose[4].y);
+    drawLine(eyeLeft[4].x, eyeLeft[4].y, nose[4].x, nose[4].y);
+    drawLine(eyeLeft[0].x, eyeLeft[0].y, eyeLeft[1].x, eyeLeft[1].y);
+    drawLine(eyeLeft[2].x, eyeLeft[2].y, eyeLeft[3].x, eyeLeft[3].y);
+    drawLine(eyeLeft[1].x, eyeLeft[1].y, eyeLeft[2].x, eyeLeft[2].y);
+    drawLine(eyeLeft[3].x, eyeLeft[3].y, eyeLeft[4].x, eyeLeft[4].y);
+    drawLine(eyeLeft[4].x, eyeLeft[4].y, eyeLeft[5].x, eyeLeft[5].y);
+    drawLine(eyeLeft[5].x, eyeLeft[5].y, eyeLeft[0].x, eyeLeft[0].y);
+    drawLine(jaw[1].x, jaw[1].y, jaw[3].x, jaw[3].y);
+    drawLine(jaw[3].x, jaw[3].y, jaw[5].x, jaw[5].y);
+    drawLine(jaw[5].x, jaw[5].y, jaw[7].x, jaw[7].y);
+    drawLine(jaw[7].x, jaw[7].y, jaw[8].x, jaw[8].y);
+    drawLine(jaw[3].x, jaw[3].y, nose[4].x, nose[4].y);
+    drawLine(jaw[1].x, jaw[1].y, eyeLeft[0].x, eyeLeft[0].y);
+    drawLine(jaw[3].x, jaw[3].y, eyeLeft[0].x, eyeLeft[0].y);
+    drawLine(jaw[3].x, jaw[3].y, eyeLeft[5].x, eyeLeft[5].y);
+    drawLine(jaw[5].x, jaw[5].y, mouth[0].x, mouth[0].y);
+    drawLine(jaw[3].x, jaw[3].y, mouth[0].x, mouth[0].y);
+    drawLine(jaw[7].x, jaw[7].y, mouth[0].x, mouth[0].y);
+    drawLine(jaw[7].x, jaw[7].y, mouth[10].x, mouth[10].y);
+    drawLine(jaw[8].x, jaw[8].y, mouth[10].x, mouth[10].y);
+    drawLine(nose[0].x, nose[0].y, eyeLeft[3].x, eyeLeft[3].y);
+    drawLine(nose[0].x, nose[0].y, centerTop.x, centerTop.y);
+    drawLine(nose[0].x, nose[0].y, nose[4].x, nose[4].y);
+    drawLine(nose[0].x, nose[0].y, nose[3].x, nose[3].y);
+    drawLine(nose[3].x, nose[3].y, nose[4].x, nose[4].y);
+    drawLine(nose[4].x, nose[4].y, nose[5].x, nose[5].y);
+    drawLine(nose[4].x, nose[4].y, nose[5].x, nose[5].y);
+    drawLine(nose[5].x, nose[5].y, nose[7].x, nose[7].y);
+    drawLine(nose[4].x, nose[4].y, mouth[0].x, mouth[0].y);
+    drawLine(nose[4].x, nose[4].y, mouth[2].x, mouth[2].y);
+    drawLine(mouth[0].x, mouth[0].y, mouth[2].x, mouth[2].y);
+    drawLine(mouth[2].x, mouth[2].y, mouth[3].x, mouth[3].y);
+    drawLine(mouth[6].x, mouth[6].y, mouth[7].x, mouth[7].y);
+    drawLine(mouth[7].x, mouth[7].y, mouth[8].x, mouth[8].y);
+    drawLine(mouth[8].x, mouth[8].y, mouth[10].x, mouth[10].y);
+    drawLine(mouth[10].x, mouth[10].y, mouth[11].x, mouth[11].y);
+    drawLine(mouth[11].x, mouth[11].y, mouth[0].x, mouth[0].y);
+    drawLine(mouth[12].x, mouth[12].y, mouth[13].x, mouth[13].y);
+    drawLine(mouth[13].x, mouth[13].y, mouth[15].x, mouth[15].y);
+    drawLine(mouth[15].x, mouth[15].y, mouth[16].x, mouth[16].y);
+    drawLine(mouth[16].x, mouth[16].y, mouth[17].x, mouth[17].y);
+    drawLine(mouth[17].x, mouth[17].y, mouth[19].x, mouth[19].y);
+    drawLine(mouth[19].x, mouth[19].y, mouth[12].x, mouth[12].y);
+    // start draw right side
+    // drawLine(eyeLeftEyeBrow[0].x, eyeLeftEyeBrow[0].y, jaw[1].x, jaw[1].y);
+    // drawLine(eyeLeftEyeBrow[0].x, eyeLeftEyeBrow[0].y, eyeLeft[0].x, eyeLeft[0].y);
+    drawLine(eyeRightEyeBrow[4].x, eyeRightEyeBrow[4].y, jaw[15].x, jaw[15].y);
+    drawLine(eyeRightEyeBrow[4].x, eyeRightEyeBrow[4].y, eyeRight[3].x, eyeRight[3].y);
+    drawLine(eyeRightEyeBrow[4].x, eyeRightEyeBrow[4].y, centerTop.x, centerTop.y);
+    drawLine(eyeRight[0].x, eyeRight[0].y, nose[0].x, nose[0].y);
+    drawLine(eyeRight[0].x, eyeRight[0].y, nose[8].x, nose[8].y);
+    drawLine(eyeRight[5].x, eyeRight[5].y, nose[8].x, nose[8].y);
+    drawLine(eyeRight[0].x, eyeRight[0].y, eyeRight[1].x, eyeRight[1].y);
+    drawLine(eyeRight[2].x, eyeRight[2].y, eyeRight[3].x, eyeRight[3].y);
+    drawLine(eyeRight[1].x, eyeRight[1].y, eyeRight[2].x, eyeRight[2].y);
+    drawLine(eyeRight[3].x, eyeRight[3].y, eyeRight[4].x, eyeRight[4].y);
+    drawLine(eyeRight[4].x, eyeRight[4].y, eyeRight[5].x, eyeRight[5].y);
+    drawLine(eyeRight[5].x, eyeRight[5].y, eyeRight[0].x, eyeRight[0].y);
+    drawLine(jaw[15].x, jaw[15].y, jaw[13].x, jaw[13].y);
+    drawLine(jaw[13].x, jaw[13].y, jaw[11].x, jaw[11].y);
+    drawLine(jaw[11].x, jaw[11].y, jaw[9].x, jaw[9].y);
+    drawLine(jaw[9].x, jaw[9].y, jaw[8].x, jaw[8].y);
+    drawLine(jaw[13].x, jaw[13].y, nose[8].x, nose[8].y);
+    drawLine(jaw[15].x, jaw[15].y, eyeRight[3].x, eyeRight[3].y);
+    drawLine(jaw[13].x, jaw[13].y, eyeRight[3].x, eyeRight[3].y);
+    drawLine(jaw[13].x, jaw[13].y, eyeRight[4].x, eyeRight[4].y);
+    drawLine(jaw[13].x, jaw[13].y, mouth[6].x, mouth[6].y);
+    drawLine(jaw[11].x, jaw[11].y, mouth[6].x, mouth[6].y);
+    drawLine(jaw[9].x, jaw[9].y, mouth[6].x, mouth[6].y);
+    drawLine(jaw[9].x, jaw[9].y, mouth[8].x, mouth[8].y);
+    drawLine(jaw[8].x, jaw[8].y, mouth[8].x, mouth[8].y);
+    drawLine(nose[0].x, nose[0].y, nose[8].x, nose[8].y);
+    drawLine(nose[3].x, nose[3].y, nose[8].x, nose[8].y);
+    drawLine(nose[8].x, nose[8].y, nose[7].x, nose[7].y);
+    drawLine(nose[8].x, nose[8].y, mouth[6].x, mouth[6].y);
+    drawLine(nose[8].x, nose[8].y, mouth[4].x, mouth[4].y);
+    drawLine(mouth[6].x, mouth[6].y, mouth[4].x, mouth[4].y);
+    drawLine(mouth[4].x, mouth[4].y, mouth[3].x, mouth[3].y);
+
+    drawCircle(jaw[1].x, jaw[1].y);
+    drawCircle(jaw[3].x, jaw[3].y);
+    drawCircle(jaw[5].x, jaw[5].y);
+    drawCircle(jaw[7].x, jaw[7].y);
+    drawCircle(jaw[8].x, jaw[8].y);
+    drawCircle(jaw[9].x, jaw[9].y);
+    drawCircle(jaw[11].x, jaw[11].y);
+    drawCircle(jaw[13].x, jaw[13].y);
+    drawCircle(jaw[15].x, jaw[15].y);
+    drawCircle(nose[0].x, nose[0].y);
+    drawCircle(centerTop.x, centerTop.y);
+    drawCircle(eyeLeftEyeBrow[0].x, eyeLeftEyeBrow[0].y);
+    drawCircle(eyeRightEyeBrow[4].x, eyeRightEyeBrow[4].y);
+    drawCircle(eyeLeft[0].x, eyeLeft[0].y);
+    drawCircle(eyeLeft[1].x, eyeLeft[1].y);
+    drawCircle(eyeLeft[2].x, eyeLeft[2].y);
+    drawCircle(eyeLeft[3].x, eyeLeft[3].y);
+    drawCircle(eyeLeft[4].x, eyeLeft[4].y);
+    drawCircle(eyeLeft[5].x, eyeLeft[5].y);
+    drawCircle(eyeLeft[0].x, eyeLeft[0].y);
+    drawCircle(eyeRight[1].x, eyeRight[1].y);
+    drawCircle(eyeRight[2].x, eyeRight[2].y);
+    drawCircle(eyeRight[3].x, eyeRight[3].y);
+    drawCircle(eyeRight[4].x, eyeRight[4].y);
+    drawCircle(eyeRight[5].x, eyeRight[5].y);
   };
   const handlePlayVideo = (event: SyntheticEvent<HTMLVideoElement, Event>) => {
     if (event.currentTarget.parentElement?.querySelector('canvas#canvas-faceapi')) {
@@ -331,13 +485,14 @@ const AppContainer = ({
     if (unsubInterval) {
       clearInterval(unsubInterval);
     }
+    if (unsubIntervalDrawer) {
+      clearInterval(unsubIntervalDrawer);
+    }
       
     if (faceapi) {
       // @ts-ignore
       const displaySize = { 
-        // @ts-ignore
         width: videoRef.current.getBoundingClientRect().width, 
-        // @ts-ignore
         height: videoRef.current.getBoundingClientRect().height, 
       };
 
@@ -358,6 +513,14 @@ const AppContainer = ({
         canvasDebugCtx = canvasDebug.getContext('2d');
         canvasDebug.width = displaySize.width;
         canvasDebug.height = displaySize.height;
+      }
+
+      const canvasMesh = event.currentTarget.parentElement?.querySelector('canvas#canvas-facemesh') as HTMLCanvasElement;
+      let canvasMeshCtx: any = null;
+      if (canvasMesh) {
+        canvasMeshCtx = canvasMesh.getContext('2d');
+        canvasMesh.width = displaySize.width;
+        canvasMesh.height = displaySize.height;
       }
 
       /* debugging purpose */
@@ -381,6 +544,13 @@ const AppContainer = ({
       // setDebugStr(JSON.stringify({ videoDimension, canvasDimension, containerDimension, videoOriDimension }, null, 2));
       /* end of debugging purpose */
 
+      unsubIntervalDrawer = setInterval(async () => {
+        const detections = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: .5 })).withFaceLandmarks();
+        if (canvasMesh) {
+          const resizedDetections = faceapi.resizeResults(detections, displaySize);
+          handleDrawMesh(resizedDetections, canvasMesh);
+        }
+      }, 100);
       unsubInterval = setInterval(async () => {
         const detections = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: .5 })).withFaceLandmarks();
         if (canvasDebugCtx) {
@@ -397,7 +567,7 @@ const AppContainer = ({
 
           // console.log({ resizedDetections, leftEye, totalXlandmarks });
 
-          if (debugMode && canvasDebug) {
+          if (debugMode && canvasDebug && pos2 === 'false') {
             const canvasDebugCtx = canvasDebug.getContext('2d');
             canvasDebugCtx?.clearRect(0, 0, displaySize.width, displaySize.height);
             // red
@@ -449,15 +619,14 @@ const AppContainer = ({
             canvasDebugCtx!.stroke();
             // percentage left face to eye
             canvasDebugCtx!.fillText(`${(leftEye[0].x - landmarkFace1.x) / totalXlandmarks}`, ((leftEye[0].x - landmarkFace1.x) / 2), leftEye[0].y);
-
           }
 
           canvasFaceApi.getContext('2d').clearRect(0, 0, canvasFaceApi.width, canvasFaceApi.height);
           
-          if (debugMode) {
-            faceapi.draw.drawDetections(canvasFaceApi, resizedDetections);
-            faceapi.draw.drawFaceLandmarks(canvasFaceApi, resizedDetections);
-          }
+          // if (debugMode) {
+          //   faceapi.draw.drawDetections(canvasFaceApi, resizedDetections);
+          //   faceapi.draw.drawFaceLandmarks(canvasFaceApi, resizedDetections);
+          // }
 
           handleValidateCamera(resizedDetections);
         } else {
@@ -1299,6 +1468,7 @@ const AppContainer = ({
               muted
             />
             <canvas id="canvas-debug" className="absolute top-0 left-0"></canvas>
+            <canvas id="canvas-facemesh" className="absolute top-0 left-0 z-[99]"></canvas>
 
             {/* area validation */}
             {cameraInfo !== 'loading' && (
