@@ -219,6 +219,9 @@ const AppContainer = ({
     if (unsubInterval) {
       clearInterval(unsubInterval);
     }
+    if (unsubIntervalDrawer) {
+      clearInterval(unsubIntervalDrawer);
+    }
     setWebcamSrc(dataUri);
     setValidationResult('validating');
     setCameraInfo('uploading');
