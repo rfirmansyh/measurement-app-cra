@@ -12,6 +12,13 @@ import config from '../../utils/config';
 import Button from '../../components/Button';
 import Input from './partials/Input';
 import useBrowserDetection from '../../hooks/useBrowserDetection';
+import icFaceNotCenter from '../../validation-assets/face-not-center.svg';
+import icFaceLoading from '../../validation-assets/face-loading.svg';
+import icFaceNotDetected from '../../validation-assets/face-not-detected.svg';
+import icFaceTilted from '../../validation-assets/face-tilted.svg';
+import icFaceTooFar from '../../validation-assets/face-too-far.svg';
+import icFaceValid from '../../validation-assets/face-valid.svg';
+import icLogo from '../../validation-assets/logo.svg';
 
 enum EStep {
   start,
@@ -730,10 +737,18 @@ const AppContainer = ({
         }
         setCameraInfo('has-result-success');
         setUploadInfo('has-result-success');
-      } catch (err) {
-        console.log({err});
-        setCameraInfo('has-result-error');
-        setUploadInfo('has-result-error');
+      } catch (err: any) {
+        const errType = err.response.data.res.type;
+        switch(errType) {
+        case 'Card Not Found':
+          setCameraInfo('no-card');
+          setUploadInfo('no-card');
+          break;
+        default:
+          setCameraInfo('has-result-error');
+          setUploadInfo('has-result-error');
+          break;
+        }
       }
       setValidationResult('idle');
     },
@@ -1158,7 +1173,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-red-500 rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={measurementCorePath + '/img/icons/face-not-center.svg'} 
+              src={icFaceNotCenter} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -1173,7 +1188,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-red-500 rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={measurementCorePath + '/img/icons/face-too-far.svg'} 
+              src={icFaceTooFar} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -1188,7 +1203,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-red-500 rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={measurementCorePath + '/img/icons/face-tilted.svg'} 
+              src={icFaceTilted} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -1203,7 +1218,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-red-500 rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={measurementCorePath + '/img/icons/face-not-detected.svg'} 
+              src={icFaceNotDetected} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -1218,7 +1233,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-secondary rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={measurementCorePath + '/img/icons/face-valid.svg'} 
+              src={icFaceValid} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative"
               alt="" 
             />
@@ -1241,7 +1256,7 @@ const AppContainer = ({
         <div className="flex gap-2 py-2 px-3 border border-black rounded-[5px] text-left mb-4">
           <div className="flex-shrink-0">
             <img 
-              src={measurementCorePath + '/img/icons/face-loading.svg'} 
+              src={icFaceLoading} 
               className="w-[24px] h-[24px] md:w-[42px] md:h-[42px] relative" 
               alt="" 
             />
@@ -1256,7 +1271,7 @@ const AppContainer = ({
         <div className="flex items-start gap-3 px-3 pb-2 pt-5 rounded-[5px] text-left">
           <div className="flex justify-center">
             <img 
-              src={measurementCorePath + '/img/icons/logo.svg'} 
+              src={icLogo} 
               className="w-[18px] md:w-[24px]" 
               alt="" 
             />
