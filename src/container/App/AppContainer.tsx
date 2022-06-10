@@ -496,7 +496,7 @@ const AppContainer = ({
       clearInterval(unsubInterval);
     }
     if (unsubIntervalDrawer) {
-      clearInterval(unsubIntervalDrawer);
+      cancelAnimationFrame(unsubIntervalDrawer);
     }
       
     if (faceapi) {
@@ -560,7 +560,7 @@ const AppContainer = ({
           const resizedDetections = faceapi.resizeResults(detections, displaySize);
           handleDrawMesh(resizedDetections, canvasMesh);
         }
-      }, 100);
+      }, 1000/60);
       unsubInterval = setInterval(async () => {
         const detections = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: .5 })).withFaceLandmarks();
         if (canvasDebugCtx) {
