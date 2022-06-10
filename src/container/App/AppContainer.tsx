@@ -555,10 +555,12 @@ const AppContainer = ({
       /* end of debugging purpose */
 
       unsubIntervalDrawer = setInterval(async () => {
-        const detections = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: .5 })).withFaceLandmarks();
-        if (canvasMesh) {
+        const detections = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: .5 })).withFaceLandmarks();
+        if (canvasMesh && detections) {
           const resizedDetections = faceapi.resizeResults(detections, displaySize);
           handleDrawMesh(resizedDetections, canvasMesh);
+        } else {
+          canvasMesh!.getContext('2d')!.clearRect(0, 0, canvasMesh.width, canvasMesh.height);
         }
       }, 1000/60);
       unsubInterval = setInterval(async () => {
@@ -641,6 +643,9 @@ const AppContainer = ({
           handleValidateCamera(resizedDetections);
         } else {
           canvasFaceApi.getContext('2d').clearRect(0, 0, canvasFaceApi.width, canvasFaceApi.height);
+          if (canvasMesh) {
+            canvasMesh!.getContext('2d')!.clearRect(0, 0, canvasMesh.width, canvasMesh.height);
+          }
           handleValidateCamera(null);
         }
       }, 1500);
@@ -773,7 +778,6 @@ const AppContainer = ({
             await Promise.all([
               faceapi.nets.tinyFaceDetector.loadFromUri(`${measurementCorePath}/vendors/face-api/model`),
               faceapi.nets.faceLandmark68Net.loadFromUri(`${measurementCorePath}/vendors/face-api/model`),
-              faceapi.nets.faceRecognitionNet.loadFromUri(`${measurementCorePath}/vendors/face-api/model`),
             ]);
             setStep(EStep.start);
           } catch (err) {
@@ -854,7 +858,6 @@ const AppContainer = ({
       handleUpload.handleSubmit();
     }
   }, [webcamSrc, handleUpload.values.email]); // eslint-disable-line
-
 
   // renderer
   const renderStartContent = (() => {

@@ -1,6 +1,6 @@
 module.exports = {
   plugins: {
     tailwindcss: {},
-    autoprefixer: {},
+    autoprefixer: { browsers: 'last 2 versions, > 1%' },
   },
 };

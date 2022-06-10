@@ -1,6 +1,8 @@
 import { AnimatePresence } from 'framer-motion';
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
 import AppContainer from './container/App/AppContainer';
 import './styles/app.css';
 
@@ -28,9 +30,9 @@ class ErrorBoundary extends Component {
 if (process.env.REACT_APP_MODE && process.env.REACT_APP_MODE === 'preview') {
   root.render(
     <ErrorBoundary>
-      <AnimatePresence initial={true} exitBeforeEnter>
-        <AppContainer />
-      </AnimatePresence>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </ErrorBoundary>
   );
 } else {

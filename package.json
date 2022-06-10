@@ -10,6 +10,7 @@
     "qs": "^6.10.3",
     "react": "^18.1.0",
     "react-dom": "^18.1.0",
+    "react-router-dom": "6",
     "react-scripts": "5.0.1",
     "yup": "^0.32.11"
   },
